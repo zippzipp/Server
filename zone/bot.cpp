@@ -2370,26 +2370,6 @@ bool Bot::IsBotNameAvailable(std::string* errorMessage) {
 				Result = true;
 
 			mysql_free_result(DatasetResult);
-
-
-
-			if(!database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT COUNT(id) FROM character_ WHERE name LIKE '%s'", this->GetCleanName()), TempErrorMessageBuffer, &DatasetResult)) {
-				*errorMessage = std::string(TempErrorMessageBuffer);
-			}
-			else {
-				uint32 ExistingNameCount = 0;
-
-				while(DataRow = mysql_fetch_row(DatasetResult)) {
-					ExistingNameCount = atoi(DataRow[0]);
-					break;
-				}
-
-				if(ExistingNameCount == 0)
-					Result = true;
-
-				mysql_free_result(DatasetResult);
-
-			}
 		}
 
 		safe_delete(Query);
@@ -3166,7 +3146,7 @@ void Bot::SpellProcess()
 void Bot::BotMeditate(bool isSitting) {
 	if(isSitting) {
 		// If the bot is a caster has less than 99% mana while its not engaged, he needs to sit to meditate
-		if(GetManaRatio() < 99.0f || GetHPRatio() < 99.0f)
+		if(GetManaRatio() < 99.0f)
 		{
 			if(!IsSitting())
 				Sit();
@@ -3785,8 +3765,7 @@ void Bot::AI_Process() {
 				//try main hand first
 				if(attack_timer.Check()) {
 					Attack(GetTarget(), SLOT_PRIMARY);
-					ItemInst *wpn = GetBotItem(SLOT_PRIMARY);      // fixes weapon procs. added 2-7-2013
-					TryWeaponProc(wpn, GetTarget(), SLOT_PRIMARY);
+
 					bool tripleSuccess = false;
 
 					if(BotOwner && GetTarget() && CanThisClassDoubleAttack()) {
@@ -4270,37 +4249,10 @@ bool Bot::DeleteBot(std::string* errorMessage) {
 	if(this->GetBotID() > 0) {
 		char* Query = 0;
 		char TempErrorMessageBuffer[MYSQL_ERRMSG_SIZE];
-		MYSQL_RES* DatasetResult;
-		MYSQL_ROW DataRow;
 
 		// TODO: These queries need to be ran together as a transaction.. ie, if one or more fail then they all will fail to commit to the database.
 
 		if(!database.RunQuery(Query, MakeAnyLenString(&Query, "DELETE FROM botinventory WHERE botid = '%u'", this->GetBotID()), TempErrorMessageBuffer)) {
-			*errorMessage = std::string(TempErrorMessageBuffer);
-		}
-		else
-			TempCounter++;
-
-		uint32 pet_id;
-		if(database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT BotPetsId FROM botpets WHERE BotId = '%u'", this->GetBotID()), TempErrorMessageBuffer, &DatasetResult)) {
-			while(DataRow = mysql_fetch_row(DatasetResult)) {
-				pet_id= atoi(DataRow[0]);
-			}
-		}
-
-		if(!database.RunQuery(Query, MakeAnyLenString(&Query, "DELETE FROM botpetinventory WHERE BotPetsId = '%u'", pet_id), TempErrorMessageBuffer)) {
-			*errorMessage = std::string(TempErrorMessageBuffer);
-		}
-		else
-			TempCounter++;
-
-		if(!database.RunQuery(Query, MakeAnyLenString(&Query, "DELETE FROM botpetbuffs WHERE BotPetsId = '%u'", pet_id), TempErrorMessageBuffer)) {
-			*errorMessage = std::string(TempErrorMessageBuffer);
-		}
-		else
-			TempCounter++;
-
-		if(!database.RunQuery(Query, MakeAnyLenString(&Query, "DELETE FROM botpets WHERE BotId = '%u'", this->GetBotID()), TempErrorMessageBuffer)) {
 			*errorMessage = std::string(TempErrorMessageBuffer);
 		}
 		else
@@ -4324,7 +4276,7 @@ bool Bot::DeleteBot(std::string* errorMessage) {
 		else
 			TempCounter++;
 
-		if(TempCounter == 7)
+		if(TempCounter == 4)
 			Result = true;
 	}
 
@@ -5228,7 +5180,7 @@ uint32 Bot::GetBotGroupLeaderIdByBotGroupName(std::string botGroupName) {
 
 	return result;
 }
-	
+
 uint32 Bot::AllowedBotSpawns(uint32 botOwnerCharacterID, std::string* errorMessage) {
 	uint32 Result = 0;
 
@@ -5255,33 +5207,7 @@ uint32 Bot::AllowedBotSpawns(uint32 botOwnerCharacterID, std::string* errorMessa
 
 	return Result;
 }
-// ADDED BY ZIPPZIPP 2-1-2013
-uint32 Bot::AllowedBotCreates(uint32 botOwnerCharacterID, std::string* errorMessage) {
-	uint32 Result = 0;
-
-	if(botOwnerCharacterID > 0) {
-		char ErrBuf[MYSQL_ERRMSG_SIZE];
-		char* Query = 0;
-		MYSQL_RES* DatasetResult;
-		MYSQL_ROW DataRow;
-
-		if(database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT value FROM quest_globals WHERE name='bot_create_limit' and charid=%i", botOwnerCharacterID), ErrBuf, &DatasetResult)) {
-			if(mysql_num_rows(DatasetResult) == 1) {
-				DataRow = mysql_fetch_row(DatasetResult);
-				if(DataRow)
-					Result = atoi(DataRow[0]);
-			}
-
-			mysql_free_result(DatasetResult);
-		}
-		else
-			*errorMessage = std::string(ErrBuf);
-
-		safe_delete_array(Query);
-	}
-
-	return Result;
-}		
+	
 uint32 Bot::SpawnedBotCount(uint32 botOwnerCharacterID, std::string* errorMessage) {
 	uint32 Result = 0;
 
@@ -11598,22 +11524,6 @@ void Bot::BotGroupSummon(Group* group, Client* client) {
 	}
 }
 
-void Bot::BotGroupSuicide(Group*group, Client*client){
-	if(group) {
-		for(int i = 0; i < MAX_GROUP_MEMBERS; i++) {
-			if(group->members[i] && group->members[i]->IsBot()) {
-				Bot* botMember = group->members[i]->CastToBot();
-
-				if(botMember->GetBotOwnerCharacterID() == client->CharacterID()) {
-					botMember->Death(NULL,10000000,NULL,_1H_BLUNT); 
-
-				}
-			}
-		}
-	}
-}
-
-
 // Finds a bot in the entitity list by bot owner character id and the bot first name
 Bot* Bot::GetBotByBotClientOwnerAndBotName(Client* c, std::string botName) {
 	Bot* Result = 0;
@@ -11970,8 +11880,8 @@ void Bot::CalcBotStats(bool showtext) {
 
 	if(showtext) {
 		GetBotOwner()->Message(15, "I'm updated.");
-		 GetBotOwner()->Message(15, "Level: %i HP: %i AC: %i Mana: %i ATK: %i STR: %i STA: %i DEX: %i AGI: %i INT: %i WIS: %i CHA: %i", GetLevel(), max_hp, GetAC(), max_mana, GetATK(), GetSTR(), GetSTA(), GetDEX(), GetAGI(), GetINT(), GetWIS(), GetCHA());
-		 GetBotOwner()->Message(15, "Resists-- Magic: %i, Poison: %i, Fire: %i, Cold: %i, Disease: %i, Corruption: %i.",GetMR(),GetPR(),GetFR(),GetCR(),GetDR(),GetCorrup());
+		GetBotOwner()->Message(15, "Level: %i HP: %i AC: %i Mana: %i STR: %i STA: %i DEX: %i AGI: %i INT: %i WIS: %i CHA: %i", GetLevel(), max_hp, GetAC(), max_mana, GetSTR(), GetSTA(), GetDEX(), GetAGI(), GetINT(), GetWIS(), GetCHA());
+		GetBotOwner()->Message(15, "Resists-- Magic: %i, Poison: %i, Fire: %i, Cold: %i, Disease: %i, Corruption: %i.",GetMR(),GetPR(),GetFR(),GetCR(),GetDR(),GetCorrup());
 	}
 }
 
@@ -12019,7 +11929,6 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		c->Message(0, "#bot create [name] [class (id)] [race (id)] [model (male/female)] - create a permanent bot. See #bot help create.");
 		c->Message(0, "#bot help create - show all the race/class id. (make it easier to create bots)");
 		c->Message(0, "#bot delete - completely destroy forever the targeted bot and all its items.");
-		c->Message(0, "#bot suicide - kill the bot you have targeted");
 		c->Message(0, "#bot list [all/class(1-16)] - list your bots all or by class. Classes: 1(Warrior), 2(Cleric), 3(Paladin), 4(Ranger), 5(Sk), 6(Druid), 7(Monk), 8(Bard), 9(Rogue), 10(Shaman), 11(Necro), 12(Wiz), 13(Mag), 14(Ench), 15(Beast), 16(Bersek)");
 		c->Message(0, "#bot spawn [bot name] - spawn a bot from it's name (use list to see all the bots). ");
 		c->Message(0, "#bot inventory list - show the inventory (and the slots IDs) of the targetted bot.");
@@ -12037,12 +11946,6 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		c->Message(0, "#bot corpse summon - Necromancers summon corpse.");
 		c->Message(0, "#bot lore - cast Identify on the item on your mouse pointer.");
 		c->Message(0, "#bot sow - Bot sow on you (Druid has options)");
-		c->Message(0, "#bot heal - Forces cleric, shaman, druid, paladin, ranger, or beastlord to heal you.");
-		c->Message(0, "#bot groupheal - Forces cleric to cast a group heal spell.");
-		c->Message(0, "#bot targetheal - Forces cleric to cast a heal on your target.");
-		c->Message(0, "#bot nuke - Forces your wizard, mage, druid, or shaman bot to nuke.");
-		c->Message(0, "#bot malo - Forces your mage, shaman, or enchanter to cast resist debuff on target.");
-		c->Message(0, "#bot slow - Forces your shaman, beastlord, or enchanter bot to cast slow on your target.");
 		c->Message(0, "#bot invis - Bot invisiblity (must have proper class in group)");
 		c->Message(0, "#bot levitate - Bot levitation (must have proper class in group)");
 		c->Message(0, "#bot resist - Bot resist buffs (must have proper class in group)");
@@ -12155,9 +12058,8 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		}
 		return;
 	}
-	
 	// Help for coloring bot armor
-	if(!strcasecmp(sep->arg[1], "help") && !strcasecmp(sep->arg[2], "armorcolor") ){
+		if(!strcasecmp(sep->arg[1], "help") && !strcasecmp(sep->arg[2], "armorcolor") ){
 		//read from db
 		char* Query = 0;
 		MYSQL_RES* DatasetResult;
@@ -12233,39 +12135,11 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 			return;
 		}
 
-		// ADDED BY ZIPPZIPP 2-1-2013
-		int createBotCount = CreatedBotCount(c->CharacterID(), &TempErrorMessage);
-		if(RuleB(Bots, BotCreateQuest)) {
-			const int allowedBots = AllowedBotCreates(c->CharacterID(), &TempErrorMessage);
-
-			if(!TempErrorMessage.empty()) {
-				c->Message(13, "Database Error: %s", TempErrorMessage.c_str());
-				return;
-			}
-
-			if(allowedBots == 0) {
-				c->Message(0, "You cannot create any bots.");
-				return;
-			}
-
-			if(createBotCount >= allowedBots) {
-				c->Message(0, "You cannot create more than %i bots.", createBotCount);
-				return;
-			}
-		} else {
-			int32 MaxBotCreate = RuleI(Bots, CreateBotCount);
-			if(createBotCount >= MaxBotCreate) {
-				c->Message(0, "You cannot create more than %i bots.", MaxBotCreate);
-				return;
-			}
-		}
-//======
-		
-	/*	int32 MaxBotCreate = RuleI(Bots, CreateBotCount);
+		uint32 MaxBotCreate = RuleI(Bots, CreateBotCount);
 		if(CreatedBotCount(c->CharacterID(), &TempErrorMessage) >= MaxBotCreate) {
 			c->Message(0, "You cannot create more than %i bots.", MaxBotCreate);
 			return;
-		}*/
+		}
 
 		if(!TempErrorMessage.empty()) {
 			c->Message(13, "Database Error: %s", TempErrorMessage.c_str());
@@ -12323,28 +12197,7 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		c->Message(0, "Example: #bot create Sneaky 9 6 male");
 		return;
 	}
-	if(!strcasecmp(sep->arg[1], "suicide")){
-		if((c->GetTarget() == NULL) || !c->GetTarget()->IsBot())
-		{
-			c->Message(15, "You must target a bot!");
-			return;
-		}
-		else if(c->GetTarget()->CastToBot()->GetBotOwnerCharacterID() != c->CharacterID())
-		{
-			c->Message(15, "You can't kill a bot that you don't own.");
-			return;
-		}
-		
-		if(c->GetTarget()->IsBot()) {
-			Bot* BotTargeted = c->GetTarget()->CastToBot();
-			
-			if(BotTargeted) {
-				BotTargeted->Death(NULL,10000000,NULL,_1H_BLUNT); 
-			}
-		}
 
-		return;
-	}
 	if(!strcasecmp(sep->arg[1], "delete") ) {
 		if((c->GetTarget() == NULL) || !c->GetTarget()->IsBot())
 		{
@@ -14217,600 +14070,7 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 			}
 		}
 	}
-	// target Heal
-	if ((!strcasecmp(sep->arg[1], "targetheal")) && (c->IsGrouped())) {
-	
-		
-		Mob *target = c->GetTarget();
-		if(target == NULL)
-		{
-			c->Message(15, "You must select a target.");
-			return;
-		}
-	
-		Mob *Healer;
-		int32 HealerClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case CLERIC:
-							Healer = g->members[i];
-							HealerClass = CLERIC;
-							break;
-						case DRUID:
-							if (HealerClass != CLERIC){
-								Healer = g->members[i];
-								HealerClass = DRUID;
-							}
-							break;
-						case SHAMAN:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = SHAMAN;
-							}
-							break;
-						case PALADIN:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = PALADIN;
-							}
-							break;
-						case RANGER:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = RANGER;
-							}
-							break;
-						case BEASTLORD:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = BEASTLORD;
-							}
-							break;
-						default:
-							break;
-					}
-				}
-			}
-			switch(HealerClass) {
 
-					case CLERIC:
-						Healer->InterruptSpell();
-
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 4)) {
-						Healer->Say("Casting Minor Healing...");
-						
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 4) && (c->GetLevel() <= 9)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 10) && (c->GetLevel() <= 19)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 20) && (c->GetLevel() <= 29)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 30) && (c->GetLevel() <= 38)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 39) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Complete Healing...");
-						Healer->CastSpell(13, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case DRUID:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 8)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 9) && (c->GetLevel() <= 18)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 19) && (c->GetLevel() <= 28)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 29) && (c->GetLevel() <= 43)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 44) && (c->GetLevel() <= 50)) {
-						Healer->Say("Casting Healing Water...");
-						Healer->CastSpell(3834, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 51) && (c->GetLevel() <= 54)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 55) && (c->GetLevel() <= 59)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(1290, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 60) && (c->GetLevel() <= 62)) {
-						Healer->Say("Casting Nature's Touch...");
-						Healer->CastSpell(1291, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 63) && (c->GetLevel() <= 65)) {
-						Healer->Say("Casting Nature's Infusion...");
-						Healer->CastSpell(3443, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 66) && (c->GetLevel() <= 67)) {
-						Healer->Say("Casting Sylvan Infusion...");
-						Healer->CastSpell(4883, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 68) && (c->GetLevel() <= 69)) {
-						Healer->Say("Casting Chlorotrope...");
-						Healer->CastSpell(5355, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 70) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Ancient: Chlorobon...");
-						Healer->CastSpell(6141, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case SHAMAN:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 8)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 9) && (c->GetLevel() <= 18)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 19) && (c->GetLevel() <= 28)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 29) && (c->GetLevel() <= 50)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 51) && (c->GetLevel() <= 54)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 55) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(1290, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Tnarg's Mending...");
-						Healer->CastSpell(3233, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 67)) {
-						Healer->Say("Casting Daluda's Mending...");
-						Healer->CastSpell(4901, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 68) && (c->GetLevel() <= 69)) {
-						Healer->Say("Casting Yoppa's Mending...");
-						Healer->CastSpell(5395, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 70) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Ancient: Wilslik's Mending...");
-						Healer->CastSpell(6142, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-					case PALADIN:
-						Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 5)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 6) && (c->GetLevel() <= 11)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 12) && (c->GetLevel() <= 26)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 27) && (c->GetLevel() <= 35)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 36) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 60)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 61) && (c->GetLevel() <= 70)) {
-						Healer->Say("Casting Touch of Nife...");
-						Healer->CastSpell(3429, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 71) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Sacred Touch...");
-						Healer->CastSpell(8560, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case RANGER:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 7)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 8) && (c->GetLevel() <= 20)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 21) && (c->GetLevel() <= 37)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-
-					else if      ((c->GetLevel() >= 38) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(11290, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 66)) {
-						Healer->Say("Casting Sylvan Light...");
-						Healer->CastSpell(4896, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 67) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Sylvan Water...");
-						Healer->CastSpell(5304, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case BEASTLORD:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 5)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 6) && (c->GetLevel() <= 19)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 20) && (c->GetLevel() <= 35)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, target->GetID(), 1, -1, -1);
-					}
-
-					else if      ((c->GetLevel() >= 36) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(11290, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 66)) {
-						Healer->Say("Casting Trushkar's Mending...");
-						Healer->CastSpell(4875, target->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 67) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Muada's Mending...");
-						Healer->CastSpell(5528, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-
-				default:
-					c->Message(15, "You must have a Cleric, Paladin, Druid, Shaman, Ranger,  or Beastlord in your group.");
-					break;
-			}
-		}
-	}
-	// Heal
-	if ((!strcasecmp(sep->arg[1], "heal")) && (c->IsGrouped())) {
-		Mob *Healer;
-		int32 HealerClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case CLERIC:
-							Healer = g->members[i];
-							HealerClass = CLERIC;
-							break;
-						case DRUID:
-							if (HealerClass != CLERIC){
-								Healer = g->members[i];
-								HealerClass = DRUID;
-							}
-							break;
-						case SHAMAN:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = SHAMAN;
-							}
-							break;
-						case PALADIN:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = PALADIN;
-							}
-							break;
-						case RANGER:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = RANGER;
-							}
-							break;
-						case BEASTLORD:
-							if (HealerClass == 0){
-								Healer = g->members[i];
-								HealerClass = BEASTLORD;
-							}
-							break;
-						default:
-							break;
-					}
-				}
-			}
-			switch(HealerClass) {
-
-					case CLERIC:
-						Healer->InterruptSpell();
-
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 4)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 4) && (c->GetLevel() <= 9)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 10) && (c->GetLevel() <= 19)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 20) && (c->GetLevel() <= 29)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 30) && (c->GetLevel() <= 38)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 39) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Complete Healing...");
-						Healer->CastSpell(13, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case DRUID:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 8)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 9) && (c->GetLevel() <= 18)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 19) && (c->GetLevel() <= 28)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 29) && (c->GetLevel() <= 43)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 44) && (c->GetLevel() <= 50)) {
-						Healer->Say("Casting Healing Water...");
-						Healer->CastSpell(3834, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 51) && (c->GetLevel() <= 54)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 55) && (c->GetLevel() <= 59)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(1290, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 60) && (c->GetLevel() <= 62)) {
-						Healer->Say("Casting Nature's Touch...");
-						Healer->CastSpell(1291, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 63) && (c->GetLevel() <= 65)) {
-						Healer->Say("Casting Nature's Infusion...");
-						Healer->CastSpell(3443, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 66) && (c->GetLevel() <= 67)) {
-						Healer->Say("Casting Sylvan Infusion...");
-						Healer->CastSpell(4883, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 68) && (c->GetLevel() <= 69)) {
-						Healer->Say("Casting Chlorotrope...");
-						Healer->CastSpell(5355, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 70) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Ancient: Chlorobon...");
-						Healer->CastSpell(6141, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case SHAMAN:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 8)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 9) && (c->GetLevel() <= 18)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 19) && (c->GetLevel() <= 28)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 29) && (c->GetLevel() <= 50)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 51) && (c->GetLevel() <= 54)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 55) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(1290, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Tnarg's Mending...");
-						Healer->CastSpell(3233, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 67)) {
-						Healer->Say("Casting Daluda's Mending...");
-						Healer->CastSpell(4901, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 68) && (c->GetLevel() <= 69)) {
-						Healer->Say("Casting Yoppa's Mending...");
-						Healer->CastSpell(5395, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 70) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Ancient: Wilslik's Mending...");
-						Healer->CastSpell(6142, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-					case PALADIN:
-						Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 5)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 6) && (c->GetLevel() <= 11)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 12) && (c->GetLevel() <= 26)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 27) && (c->GetLevel() <= 35)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 36) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 60)) {
-						Healer->Say("Casting Superior Healing...");
-						Healer->CastSpell(9, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 61) && (c->GetLevel() <= 70)) {
-						Healer->Say("Casting Touch of Nife...");
-						Healer->CastSpell(3429, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 71) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Sacred Touch...");
-						Healer->CastSpell(8560, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case RANGER:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 7)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 8) && (c->GetLevel() <= 20)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 21) && (c->GetLevel() <= 37)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-
-					else if      ((c->GetLevel() >= 38) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(11290, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 66)) {
-						Healer->Say("Casting Sylvan Light...");
-						Healer->CastSpell(4896, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 67) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Sylvan Water...");
-						Healer->CastSpell(5304, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case BEASTLORD:
-					Healer->InterruptSpell();
-					if      ((c->GetLevel() >= 1) && (c->GetLevel() <= 5)) {
-						Healer->Say("Casting Salve...");
-						Healer->CastSpell(5011, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 6) && (c->GetLevel() <= 19)) {
-						Healer->Say("Casting Minor Healing...");
-						Healer->CastSpell(200, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 20) && (c->GetLevel() <= 35)) {
-						Healer->Say("Casting Light Healing...");
-						Healer->CastSpell(17, c->GetID(), 1, -1, -1);
-					}
-
-					else if      ((c->GetLevel() >= 36) && (c->GetLevel() <= 56)) {
-						Healer->Say("Casting Healing...");
-						Healer->CastSpell(12, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 61)) {
-						Healer->Say("Casting Greater Healing...");
-						Healer->CastSpell(15, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 62) && (c->GetLevel() <= 64)) {
-						Healer->Say("Casting Chloroblast...");
-						Healer->CastSpell(11290, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 65) && (c->GetLevel() <= 66)) {
-						Healer->Say("Casting Trushkar's Mending...");
-						Healer->CastSpell(4875, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 67) && (c->GetLevel() <= 255)) {
-						Healer->Say("Casting Muada's Mending...");
-						Healer->CastSpell(5528, c->GetID(), 1, -1, -1);
-					}
-					break;
-
-
-				default:
-					c->Message(15, "You must have a Cleric, Paladin, Druid, Shaman, Ranger,  or Beastlord in your group.");
-					break;
-			}
-		}
-	}
 	//Endure Breath
 	if ((!strcasecmp(sep->arg[1], "endureb")) && (c->IsGrouped())) {
 		Mob *Endurer;
@@ -14906,565 +14166,7 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 			}
 		}
 	}
-	// groupheal
-	if ((!strcasecmp(sep->arg[1], "groupheal")) && (c->IsGrouped())) {
-		Mob *Grphler;
-		int32 GrphlerClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case CLERIC:
-							Grphler = g->members[i];
-							GrphlerClass = CLERIC;
-							break;
-						default:
-							break;
-					}
-				}
-			}
-			
-			switch(GrphlerClass) {
-        		case CLERIC:
-					Grphler->InterruptSpell();
-					if((c->GetLevel() >= 30) && (c->GetLevel() <= 44)) {
-						Grphler->Say("Casting Word of Health...");
-						Grphler->CastSpell(135, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 45) && (c->GetLevel() <= 51)) {
-						Grphler->Say("Casting Word of Healing...");
-						Grphler->CastSpell(136, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 52) && (c->GetLevel() <= 56)) {
-						Grphler->Say("Casting Word of Vigor...");
-						Grphler->CastSpell(1520, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 57) && (c->GetLevel() <= 59)) {
-						Grphler->Say("Casting Word of Restoration...");
-						Grphler->CastSpell(1521, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 60) && (c->GetLevel() <= 63)) {
-						Grphler->Say("Casting Word of Redemption...");
-						Grphler->CastSpell(1523, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 64) && (c->GetLevel() <= 68)) {
-						Grphler->Say("Casting Word of Replenishment...");
-						Grphler->CastSpell(3471, c->GetID(), 1, -1, -1);
-					}
-					else if      ((c->GetLevel() >= 69) && (c->GetLevel() <= 255)) {
-						Grphler->Say("Casting Word of Vivification...");
-						Grphler->CastSpell(5270, c->GetID(), 1, -1, -1);
-					}
-					break;
 
-				default:
-					c->Message(15, "You must have a Cleric in your group.");
-					break;
-			}
-		}
-	}
-	//Nuke
-	if(!strcasecmp(sep->arg[1], "nuke")) {
-		Mob *target = c->GetTarget();
-		if(target == NULL || target->IsClient() || target->IsBot() || (target->IsPet() && target->GetOwner()->IsBot()))
-		{
-			c->Message(15, "You must select a monster");
-			return;
-		}
-		int32 DBtype = c->GetTarget()->GetBodyType();
-		Mob *Nuker;
-		int32 NukerClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case WIZARD:
-							Nuker = g->members[i];
-							NukerClass = WIZARD;
-							break;
-						case MAGICIAN:
-							if(NukerClass != WIZARD){
-								Nuker = g->members[i];
-								NukerClass = MAGICIAN;
-							}
-                                                        break;
-						case DRUID:
-							if (NukerClass == 0){
-								Nuker = g->members[i];
-								NukerClass = DRUID;
-							}
-							break;
-						case SHAMAN:
-							if (NukerClass == 0){
-								Nuker = g->members[i];
-								NukerClass = SHAMAN;
-							}
-							break;
-						default:
-							break;
-					}
-				}
-			}
-			switch(NukerClass) {
-				case WIZARD:
-					Nuker->InterruptSpell();
-					if	((c->GetLevel() >= 1) && (c->GetLevel() <= 4)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(372, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 5) && (c->GetLevel() <= 9)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(477, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 10) && (c->GetLevel() <= 14)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(383, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 15) && (c->GetLevel() <= 16)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(657, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 17) && (c->GetLevel() <= 25)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(22, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 26) && (c->GetLevel() <= 42)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(465, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 43) && (c->GetLevel() <= 59)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(659, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 60) && (c->GetLevel() <= 62)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1426, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 63) && (c->GetLevel() <= 64)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(3335, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 65) && (c->GetLevel() <= 69)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(4981, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 70) && (c->GetLevel() <= 255)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(8043, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case MAGICIAN:
-					Nuker->InterruptSpell();
-					if	((c->GetLevel() >= 1) && (c->GetLevel() <= 4)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(93, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 5) && (c->GetLevel() <= 14)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(322, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 15) && (c->GetLevel() <= 17)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(334, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 18) && (c->GetLevel() <= 30)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(68, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 31) && (c->GetLevel() <= 32)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(120, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 33) && (c->GetLevel() <= 40)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(69, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 41) && (c->GetLevel() <= 46)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(114, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 47) && (c->GetLevel() <= 51)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(70, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 52) && (c->GetLevel() <= 56)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1660, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 57) && (c->GetLevel() <= 62)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1663, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 63) && (c->GetLevel() <= 65)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(3321, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 66) && (c->GetLevel() <= 255)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(5474, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case DRUID:
-					Nuker->InterruptSpell();
-					if	((c->GetLevel() >= 1) && (c->GetLevel() <= 2)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(93, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 3) && (c->GetLevel() <= 7)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(92, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 8) && (c->GetLevel() <= 15)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(91, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 16) && (c->GetLevel() <= 27)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(419, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 28) && (c->GetLevel() <= 37)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(217, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 38) && (c->GetLevel() <= 42)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(57, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 43) && (c->GetLevel() <= 47)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1740, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 48) && (c->GetLevel() <= 53)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(671, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 54) && (c->GetLevel() <= 58)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1603, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 59) && (c->GetLevel() <= 64)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1607, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 65) && (c->GetLevel() <= 68)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(4884, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 69) && (c->GetLevel() <= 255)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(5361, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case SHAMAN:
-					Nuker->InterruptSpell();
-					if	((c->GetLevel() >= 1) && (c->GetLevel() <= 3)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(93, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 4) && (c->GetLevel() <= 13)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(275, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 14) && (c->GetLevel() <= 22)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(282, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 23) && (c->GetLevel() <= 32)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(508, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 33) && (c->GetLevel() <= 41)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(509, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 42) && (c->GetLevel() <= 46)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(1429, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 47) && (c->GetLevel() <= 53)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(3573, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 54) && (c->GetLevel() <= 255)) {
-						Nuker->Say("Nuking %s \n", target->GetCleanName(), sep->arg[2]);
-						Nuker->CastSpell(3574, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-
-				default:
-					c->Message(15, "You must have a Wizard, Magician, Shaman, or Druid in your group.");
-					break;
-			}
-		}
-	}
-	//Malo
-	if(!strcasecmp(sep->arg[1], "malo")) {
-		Mob *target = c->GetTarget();
-		if(target == NULL || target->IsClient() || target->IsBot() || (target->IsPet() && target->GetOwner()->IsBot()))
-		{
-			c->Message(15, "You must select a monster");
-			return;
-		}
-		int32 DBtype = c->GetTarget()->GetBodyType();
-		Mob *Debuffer;
-		int32 DebufferClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case SHAMAN:
-							Debuffer = g->members[i];
-							DebufferClass = SHAMAN;
-							break;
-						case MAGICIAN:
-							if(DebufferClass != SHAMAN){
-								Debuffer = g->members[i];
-								DebufferClass = MAGICIAN;
-							}
-                                                        break;
-						case ENCHANTER:
-							if (DebufferClass == 0){
-								Debuffer = g->members[i];
-								DebufferClass = ENCHANTER;
-							}
-							break;
-						default:
-							break;
-					}
-				}
-			}
-			switch(DebufferClass) {
-				case SHAMAN:
-					Debuffer->InterruptSpell();
-					if	((c->GetLevel() >= 18) && (c->GetLevel() <= 31)) {
-						Debuffer->Say("Casting Malaise on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(110, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 32) && (c->GetLevel() <= 47)) {
-						Debuffer->Say("Casting Malaisement on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(111, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 48) && (c->GetLevel() <= 56)) {
-						Debuffer->Say("Casting Malosi on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(112, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 57) && (c->GetLevel() <= 59)) {
-						Debuffer->Say("Casting Malosini on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(1577, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 60) && (c->GetLevel() <= 62)) {
-						Debuffer->Say("Casting Malo on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(1578, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 63) && (c->GetLevel() <= 64)) {
-						Debuffer->Say("Casting Malosinia on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(3387, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 65) && (c->GetLevel() <= 71)) {
-						Debuffer->Say("Casting Malos on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(3395, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 72) && (c->GetLevel() <= 74)) {
-						Debuffer->Say("Casting Malosinise on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(8520, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 75) && (c->GetLevel() <= 76)) {
-						Debuffer->Say("Casting Malis on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(8541, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 77) && (c->GetLevel() <= 255)) {
-						Debuffer->Say("Casting Malosinatia on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(14659, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case MAGICIAN:
-					Debuffer->InterruptSpell();
-					if	((c->GetLevel() >= 22) && (c->GetLevel() <= 43)) {
-						Debuffer->Say("Casting Malaise on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(110, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 44) && (c->GetLevel() <= 50)) {
-						Debuffer->Say("Casting Malaisement on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(111, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 51) && (c->GetLevel() <= 57)) {
-						Debuffer->Say("Casting Malosi %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(112, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 58) && (c->GetLevel() <= 59)) {
-						Debuffer->Say("Casting Malosini %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(1577, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 60) && (c->GetLevel() <= 62)) {
-						Debuffer->Say("Casting Mala on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(1772, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 63) && (c->GetLevel() <= 70)) {
-						Debuffer->Say("Casting Malosinia on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(3387, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 71) && (c->GetLevel() <= 75)) {
-						Debuffer->Say("Casting Malosinise on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(8520, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 76) && (c->GetLevel() <= 255)) {
-						Debuffer->Say("Casting Malosinatia on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(14659, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case ENCHANTER:
-					Debuffer->InterruptSpell();
-					if	((c->GetLevel() >= 2) && (c->GetLevel() <= 17)) {
-						Debuffer->Say("asting Tashan on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(676, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 18) && (c->GetLevel() <= 40)) {
-						Debuffer->Say("Casting Tashani on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(677, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 41) && (c->GetLevel() <= 56)) {
-						Debuffer->Say("Casting Tashania on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(678, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 57) && (c->GetLevel() <= 60)) {
-						Debuffer->Say("Casting Tashanian on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(1702, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 61) && (c->GetLevel() <= 71)) {
-						Debuffer->Say("Casting Howl of Tashan on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(3342, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 72) && (c->GetLevel() <= 255)) {
-						Debuffer->Say("Casting Echo of Tashan on %s \n", target->GetCleanName(), sep->arg[2]);
-						Debuffer->CastSpell(8663, target->GetID(), 1, -1, -1);
-					}
-					
-				default:
-					c->Message(15, "You must have a Shaman, Magician, or Enchanter in your group.");
-					break;
-			}
-		}
-	}
-	//Slow
-	if(!strcasecmp(sep->arg[1], "slow")){
-		Mob *target = c->GetTarget();
-		if(target == NULL || target->IsClient() || target->IsBot() || (target->IsPet() && target->GetOwner()->IsBot()))
-		{
-			c->Message(15, "You must select a monster");
-			return;
-		}
-		int32 DBtype = c->GetTarget()->GetBodyType();
-		Mob *Slower;
-		int32 SlowerClass = 0;
-		Group *g = c->GetGroup();
-		if(g) {
-			for(int i=0; i<MAX_GROUP_MEMBERS; i++){
-				if(g->members[i] && g->members[i]->IsBot()) {
-					switch(g->members[i]->GetClass()) {
-						case SHAMAN:
-							Slower = g->members[i];
-							SlowerClass = SHAMAN;
-							break;
-						case ENCHANTER:
-							if(SlowerClass != SHAMAN){
-								Slower = g->members[i];
-								SlowerClass = ENCHANTER;
-							}
-                                                        break;
-						case BEASTLORD:
-							if (SlowerClass == 0){
-								Slower = g->members[i];
-								SlowerClass = BEASTLORD;
-							}
-							break;
-
-						default:
-							break;
-					}
-				}
-			}
-			switch(SlowerClass) {
-				case SHAMAN:
-					Slower->InterruptSpell();
-					if	((c->GetLevel() >= 5) && (c->GetLevel() <= 12)) {
-						Slower->Say("Casting Drowsy on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(270, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 13) && (c->GetLevel() <= 26)) {
-						Slower->Say("Casting Walking Sleep on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(505, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 27) && (c->GetLevel() <= 37)) {
-						Slower->Say("Casting Tagar's Insects on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(506, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 38) && (c->GetLevel() <= 50)) {
-						Slower->Say("Casting Togor's Insects on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(507, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 51) && (c->GetLevel() <= 255)) {
-						Slower->Say("Casting Turgur's Insects on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(1588, target->GetID(), 1, -1, -1);
-					}
-
-					break;
-
-				case ENCHANTER:
-					Slower->InterruptSpell();
-					if	((c->GetLevel() >= 9) && (c->GetLevel() <= 22)) {
-						Slower->Say("Casting Languid Pace on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(302, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 23) && (c->GetLevel() <= 40)) {
-						Slower->Say("Casting Tepid Deeds on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(185, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 41) && (c->GetLevel() <= 56)) {
-						Slower->Say("Casting Shiftless Deeds on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(186, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 57) && (c->GetLevel() <= 255)) {
-						Slower->Say("Casting Forlorn Deeds on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(1712, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-				case BEASTLORD:
-					Slower->InterruptSpell();
-					if	((c->GetLevel() >= 20) && (c->GetLevel() <= 49)) {
-						Slower->Say("Casting Drowsy on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(270, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 50) && (c->GetLevel() <= 59)) {
-						Slower->Say("Casting Sha's Lethargy on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(2634, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 60) && (c->GetLevel() <= 64)) {
-						Slower->Say("Casting Sha's Advantage on %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(2942, target->GetID(), 1, -1, -1);
-					}
-					else if ((c->GetLevel() >= 65) && (c->GetLevel() <= 255)) {
-						Slower->Say("Casting Sha's Revenge %s \n", target->GetCleanName(), sep->arg[2]);
-						Slower->CastSpell(3462, target->GetID(), 1, -1, -1);
-					}
-					break;
-
-
-				default:
-					c->Message(15, "You must have a Shaman, Enchanter, or Beastlord in your group.");
-					break;
-			}
-		}
-	}
 	//Invisible
 	if ((!strcasecmp(sep->arg[1], "invis")) && (c->IsGrouped())) {
 		Mob *Inviser;
@@ -15901,7 +14603,8 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		return;
 	}
 
-	if(!strcasecmp(sep->arg[1], "debug") && !strcasecmp(sep->arg[2], "botcaracs")){
+	if(!strcasecmp(sep->arg[1], "debug") && !strcasecmp(sep->arg[2], "botcaracs"))
+	{
 		Mob *target = c->GetTarget();
 		if(target && target->IsBot())
 		{
@@ -15915,7 +14618,8 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		return;
 	}
 
-	if(!strcasecmp(sep->arg[1], "debug") && !strcasecmp(sep->arg[2], "spells")){
+	if(!strcasecmp(sep->arg[1], "debug") && !strcasecmp(sep->arg[2], "spells"))
+	{
 		Mob *target = c->GetTarget();
 		if(target && target->IsBot())
 		{
@@ -15938,7 +14642,6 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		c->Message(0, "#bot group follow <bot group leader name or target>");
 		c->Message(0, "#bot group guard <bot group leader name or target>");
 		c->Message(0, "#bot group attack <bot group leader name> <mob name to attack or target>");
-		c->Message(0, "#bot group suicide - this kills all the bots you own in your group.");
 
 		return;
 	}
@@ -15962,10 +14665,8 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		else if(!strcasecmp(sep->arg[2], "summon")) {
 			if(c->IsGrouped())
 				BotGroupSummon(c->GetGroup(), c);
-		} else if(!strcasecmp(sep->arg[2], "suicide")) {
-			if(c->IsGrouped())
-				BotGroupSuicide(c->GetGroup(), c);
 		}
+
 		return;
 	}
 

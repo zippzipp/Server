@@ -178,6 +178,7 @@ void Mob::DoSpecialAttackDamage(Mob *who, SkillType skill, int32 max_damage, int
 		DoRiposte(who);	
 }
 
+
 void Client::OPCombatAbility(const EQApplicationPacket *app) {
 	if(!GetTarget())
 		return;
@@ -211,6 +212,15 @@ void Client::OPCombatAbility(const EQApplicationPacket *app) {
 		//could we return here? Im not sure is m_atk 11 is used for real specials
 	}
 	
+	//check range for all these abilities, they are all close combat stuff
+	if(!CombatRange(GetTarget()))
+		return;
+	
+	if(!p_timers.Expired(&database, pTimerCombatAbility, false)) {
+		Message(13,"Ability recovery time not yet met.");
+		return;
+	}
+	
 	int ReuseTime = 0;
 	int ClientHaste = GetHaste();
 	int HasteMod = 0;
@@ -224,25 +234,6 @@ void Client::OPCombatAbility(const EQApplicationPacket *app) {
 	int32 dmg = 0;
 
 	int32 skill_reduction = this->GetSkillReuseTime(ca_atk->m_skill);
-	
-	
-	// CASE NO RANGE
-	/*if ((ca_atk->m_atk == 100) && (ca_atk->m_skill == _2H_SLASHING)) 
-	{
-		Attack(GetTarget(), 13);
-		return;
-	}*/
-	
-	
-	//check range for all these abilities, they are all close combat stuff
-	if(!CombatRange(GetTarget()))
-		return;
-	
-	
-	if(!p_timers.Expired(&database, pTimerCombatAbility, false)) {
-		Message(13,"Ability recovery time not yet met.");
-		return;
-	}
 	
 	if ((ca_atk->m_atk == 100) 
 	  && (ca_atk->m_skill == BASH)) {    // SLAM - Bash without a shield equipped
@@ -1968,11 +1959,11 @@ void Mob::Taunt(NPC* who, bool always_succeed, float chance_bonus) {
 		if (tauntchance > MakeRandomFloat(0, 1)) {
 			
 			if (hate_top && hate_top != this){
-				newhate = (who->GetNPCHate(hate_top) - who->GetNPCHate(this)) + 5; //1;
+				newhate = (who->GetNPCHate(hate_top) - who->GetNPCHate(this)) + 1;
 				who->CastToNPC()->AddToHateList(this, newhate);
 			}
 			else
-				who->CastToNPC()->AddToHateList(this,20);//12);
+				who->CastToNPC()->AddToHateList(this,12);
 				
 			if (who->CanTalk())
 				who->Say_StringID(SUCCESSFUL_TAUNT,GetCleanName()); 

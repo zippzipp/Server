@@ -356,7 +356,6 @@ public:
 	static uint32 SpawnedBotCount(uint32 botOwnerCharacterID, std::string* errorMessage);
 	static uint32 CreatedBotCount(uint32 botOwnerCharacterID, std::string* errorMessage);
 	static uint32 AllowedBotSpawns(uint32 botOwnerCharacterID, std::string* errorMessage);
-	static uint32 AllowedBotCreates(uint32 botOwnerCharacterID, std::string* errorMessage); // << ADDED BY ZIPPZIPP 2-1-2013
 	static uint32 GetBotOwnerCharacterID(uint32 botID, std::string* errorMessage);
 	//static bool SetBotOwnerCharacterID(uint32 botID, uint32 botOwnerCharacterID, std::string* errorMessage);
 	static std::string ClassIdToString(uint16 classId);
@@ -366,7 +365,6 @@ public:
 	static void BotGroupOrderGuard(Group* group, Client* client);
 	static void BotGroupOrderAttack(Group* group, Mob* target, Client* client);
 	static void BotGroupSummon(Group* group, Client* client);
-	static void BotGroupSuicide(Group* group, Client* client);
 	static Bot* GetBotByBotClientOwnerAndBotName(Client* c, std::string botName);
 	static void ProcessBotGroupInvite(Client* c, std::string botName);
 	static void ProcessBotGroupDisband(Client* c, std::string botName);
