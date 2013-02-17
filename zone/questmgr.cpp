@@ -1841,7 +1841,11 @@ int QuestManager::createbotcount() {
 int QuestManager::spawnbotcount() {
 	return RuleI(Bots, SpawnBotCount);
 }
-
+// ADDED BY ZIPPZIPP 2-1-2013
+bool QuestManager::botcreatequest()
+{
+	return RuleB(Bots, BotCreateQuest);
+}
 bool QuestManager::botquest()
 {
 	return RuleB(Bots, BotQuest);
@@ -1850,7 +1854,15 @@ bool QuestManager::botquest()
 bool QuestManager::createBot(const char *name, const char *lastname, uint8 level, uint16 race, uint8 botclass, uint8 gender)
 {
 	std::string TempErrorMessage;
-	uint32 MaxBotCreate = RuleI(Bots, CreateBotCount);
+	
+		
+	int32 MaxBotCreate = RuleI(Bots, CreateBotCount);
+	
+	// added by zippzipp 2-1-2013
+	if(RuleB(Bots, BotCreateQuest)){
+		MaxBotCreate = Bot::AllowedBotCreates(initiator->CharacterID(), &TempErrorMessage);
+	}
+
 
 	if (initiator && initiator->IsClient())
 	{

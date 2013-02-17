@@ -2091,7 +2091,7 @@ void Client::Handle_OP_ItemVerifyRequest(const EQApplicationPacket *app)
 		return;
 	}
 
-	LogFile->write(EQEMuLog::Debug, "OP ItemVerifyRequest: spell=%i, target=%i, inv=%i", spell_id, target_id, slot_id);
+	//LogFile->write(EQEMuLog::Debug, "OP ItemVerifyRequest: spell=%i, target=%i, inv=%i", spell_id, target_id, slot_id);
 
 	if ((slot_id < 30) || (slot_id == 9999) || (slot_id > 250 && slot_id < 331 && ((item->ItemType == ItemTypePotion) || item->PotionBelt))) // sanity check
 	{
