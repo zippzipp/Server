@@ -2347,7 +2347,8 @@ bool Bot::IsValidName() {
 }
 
 bool Bot::IsBotNameAvailable(std::string* errorMessage) {
-	bool Result = false;
+	bool Result1 = false;
+	bool Result2 = false;
 
 	if(this->GetCleanName()) {
 		char* Query = 0;
@@ -2367,7 +2368,7 @@ bool Bot::IsBotNameAvailable(std::string* errorMessage) {
 			}
 
 			if(ExistingNameCount == 0)
-				Result = true;
+				Result1 = true;
 
 			mysql_free_result(DatasetResult);
 
@@ -2385,17 +2386,19 @@ bool Bot::IsBotNameAvailable(std::string* errorMessage) {
 				}
 
 				if(ExistingNameCount == 0)
-					Result = true;
+					Result2 = true;
 
 				mysql_free_result(DatasetResult);
 
 			}
 		}
-
 		safe_delete(Query);
 	}
 
-	return Result;
+	if(Result1 && Result2)
+		return true;
+	else
+		return false;
 }
 
 bool Bot::Save() {
