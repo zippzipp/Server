@@ -12333,7 +12333,7 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 			gender = 1;
 
 		if(!IsBotNameAvailable2(std::string(sep->arg[2]),&TempErrorMessage)) {
-			c->Message(0, "The name %s is already being used. Please choose a different name.", NewBot->GetCleanName());
+			c->Message(0, "The name %s is already being used. Please choose a different name.", std::string(sep->arg[2]));
 			return;
 		}
 
