@@ -156,6 +156,7 @@ public:
 	bool IsValidRaceClassCombo();
 	bool IsValidName();
 	bool IsBotNameAvailable(std::string* errorMessage);
+	bool Bot::IsBotNameAvailable2(std::string botName, std::string* errorMessage);
 	bool DeleteBot(std::string* errorMessage);
 	void Spawn(Client* botCharacterOwner, std::string* errorMessage);
 	virtual void SetLevel(uint8 in_level, bool command = false);
