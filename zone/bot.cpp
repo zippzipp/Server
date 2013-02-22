@@ -2349,7 +2349,7 @@ bool Bot::IsBotNameAvailable2(std::string botName, std::string* errorMessage) {
 	bool Result1 = false;
 	bool Result2 = false;
 
-	if(botName) {
+	if(botName != NULL) {
 		char* Query = 0;
 		char TempErrorMessageBuffer[MYSQL_ERRMSG_SIZE];
 		MYSQL_RES* DatasetResult;
