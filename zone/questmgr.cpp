@@ -1878,7 +1878,7 @@ bool QuestManager::createBot(const char *name, const char *lastname, uint8 level
 			return false;
 		}
 
-		if(IsBotNameAvailable(name,&TempErrorMessage)) {
+		if(Bot::IsBotNameAvailable(name,&TempErrorMessage)) {
 			initiator->Message(0, "The name %s is already being used. Please choose a different name.", name);
 			return false;
 		}
