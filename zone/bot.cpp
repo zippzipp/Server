@@ -2345,7 +2345,7 @@ bool Bot::IsValidName() {
 
 	return Result;
 }
-bool Bot::IsBotNameAvailable2(std::string botName, std::string* errorMessage) {
+bool Bot::IsBotNameAvailable2(char *botName, std::string* errorMessage) {
 	bool Result1 = false;
 	bool Result2 = false;
 
@@ -12332,7 +12332,7 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		if(!strcasecmp(sep->arg[5], "female"))
 			gender = 1;
 
-		if(!IsBotNameAvailable2(std::string(sep->arg[2]),&TempErrorMessage)) {
+		if(!IsBotNameAvailable2(sep->arg[2],&TempErrorMessage)) {
 			c->Message(0, "The name %s is already being used. Please choose a different name.", std::string(sep->arg[2]));
 			return;
 		}
