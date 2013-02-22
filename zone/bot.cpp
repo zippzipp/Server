@@ -2345,7 +2345,7 @@ bool Bot::IsValidName() {
 
 	return Result;
 }
-bool Bot::IsBotNameAvailable2(char *botName, std::string* errorMessage) {
+bool Bot::IsBotNameAvailable(char *botName, std::string* errorMessage) {
 	bool Result1 = false;
 	bool Result2 = false;
 
@@ -2371,66 +2371,9 @@ bool Bot::IsBotNameAvailable2(char *botName, std::string* errorMessage) {
 
 			mysql_free_result(DatasetResult);
 
-
-
 			if(!database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT COUNT(id) FROM character_ WHERE name LIKE '%s'", botName), TempErrorMessageBuffer, &DatasetResult)) {
 				*errorMessage = std::string(TempErrorMessageBuffer);
-			}
-			else {
-				uint32 ExistingNameCount = 0;
-
-				while(DataRow = mysql_fetch_row(DatasetResult)) {
-					ExistingNameCount = atoi(DataRow[0]);
-					break;
-				}
-
-				if(ExistingNameCount == 0)
-					Result2 = true;
-
-				mysql_free_result(DatasetResult);
-
-			}
-		}
-		safe_delete(Query);
-	}
-
-	if(Result1 && Result2)
-		return true;
-	else
-		return false;
-}
-bool Bot::IsBotNameAvailable(std::string* errorMessage) {
-	bool Result1 = false;
-	bool Result2 = false;
-
-	if(this->GetCleanName()) {
-		char* Query = 0;
-		char TempErrorMessageBuffer[MYSQL_ERRMSG_SIZE];
-		MYSQL_RES* DatasetResult;
-		MYSQL_ROW DataRow;
-
-		if(!database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT COUNT(id) FROM vwBotCharacterMobs WHERE name LIKE '%s'", this->GetCleanName()), TempErrorMessageBuffer, &DatasetResult)) {
-			*errorMessage = std::string(TempErrorMessageBuffer);
-		}
-		else {
-			uint32 ExistingNameCount = 0;
-
-			while(DataRow = mysql_fetch_row(DatasetResult)) {
-				ExistingNameCount = atoi(DataRow[0]);
-				break;
-			}
-
-			if(ExistingNameCount == 0)
-				Result1 = true;
-
-			mysql_free_result(DatasetResult);
-
-
-
-			if(!database.RunQuery(Query, MakeAnyLenString(&Query, "SELECT COUNT(id) FROM character_ WHERE name LIKE '%s'", this->GetCleanName()), TempErrorMessageBuffer, &DatasetResult)) {
-				*errorMessage = std::string(TempErrorMessageBuffer);
-			}
-			else {
+			} else {
 				uint32 ExistingNameCount = 0;
 
 				while(DataRow = mysql_fetch_row(DatasetResult)) {
@@ -12332,11 +12275,10 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 		if(!strcasecmp(sep->arg[5], "female"))
 			gender = 1;
 
-		if(!IsBotNameAvailable2(sep->arg[2],&TempErrorMessage)) {
+		if(!IsBotNameAvailable(sep->arg[2],&TempErrorMessage)) {
 			c->Message(0, "The name %s is already being used. Please choose a different name.", sep->arg[2]);
 			return;
 		}
-
 
 		NPCType DefaultNPCTypeStruct = CreateDefaultNPCTypeStructForBot(std::string(sep->arg[2]), std::string(), c->GetLevel(), atoi(sep->arg[4]), atoi(sep->arg[3]), gender);
 		Bot* NewBot = new Bot(DefaultNPCTypeStruct, c);
@@ -12349,11 +12291,6 @@ void Bot::ProcessBotCommands(Client *c, const Seperator *sep) {
 
 			if(!NewBot->IsValidName()) {
 				c->Message(0, "%s has invalid characters. You can use only the A-Z, a-z and _ characters in a bot name.", NewBot->GetCleanName());
-				return;
-			}
-
-			if(!NewBot->IsBotNameAvailable(&TempErrorMessage)) {
-				c->Message(0, "The name %s is already being used. Please choose a different name.", NewBot->GetCleanName());
 				return;
 			}
 

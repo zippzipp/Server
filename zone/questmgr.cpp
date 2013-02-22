@@ -1878,6 +1878,11 @@ bool QuestManager::createBot(const char *name, const char *lastname, uint8 level
 			return false;
 		}
 
+		if(IsBotNameAvailable(name.c_str(),&TempErrorMessage)) {
+			initiator->Message(0, "The name %s is already being used. Please choose a different name.", name.c_str());
+			return false;
+		}
+
 		NPCType DefaultNPCTypeStruct = Bot::CreateDefaultNPCTypeStructForBot(name, lastname, level, race, botclass, gender);
 		Bot* NewBot = new Bot(DefaultNPCTypeStruct, initiator);
 
@@ -1890,11 +1895,6 @@ bool QuestManager::createBot(const char *name, const char *lastname, uint8 level
 
 			if(!NewBot->IsValidName()) {
 				initiator->Message(0, "%s has invalid characters. You can use only the A-Z, a-z and _ characters in a bot name.", NewBot->GetCleanName());
-				return false;
-			}
-
-			if(!NewBot->IsBotNameAvailable(&TempErrorMessage)) {
-				initiator->Message(0, "The name %s is already being used. Please choose a different name.", NewBot->GetCleanName());
 				return false;
 			}
 
